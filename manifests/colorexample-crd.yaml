@@ -1,0 +1,29 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: colorexamples.operators.kneedeep.io
+spec:
+  group: operators.kneedeep.io
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                color:
+                  type: string
+                  enum: ["red", "blue", "green", "yellow", "purple", "grey"]
+                version:
+                  type: string
+  scope: Namespaced
+  names:
+    singular: colorexample
+    plural: colorexamples
+    kind: ColorExample
+    shortNames:
+      - ce
