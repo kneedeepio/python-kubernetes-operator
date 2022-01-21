@@ -8,7 +8,7 @@ import os
 import sys
 import yaml
 
-from kubernetes_asyncio import client, config
+from kubernetes_asyncio import client, config, watch
 from kubernetes_asyncio.client.api_client import ApiClient, ApiException
 
 from k8sobjects import CustomResourceDefinition
@@ -60,6 +60,42 @@ async def check_for_crd(yaml_filename, create_allowed = False):
             )
             raise CannotContinueException()
 
+async def watch_namespaces():
+    async with client.ApiClient() as api_client:
+        api_instance = client.CoreV1Api(api_client)
+        async with watch.Watch().stream(api_instance.list_namespace) as stream:
+            async for event in stream:
+                logging.info("Namespace Event - Type: %s, Name: %s", event['type'], event['object'].metadata.name)
+
+async def watch_pods():
+    async with client.ApiClient() as api_client:
+        api_instance = client.CoreV1Api(api_client)
+        async with watch.Watch().stream(api_instance.list_pod_for_all_namespaces) as stream:
+            async for event in stream:
+                logging.info(
+                    "Pod Event - Type: %s, Name: %s, Namespace: %s",
+                    event['type'],
+                    event['object'].metadata.name,
+                    event['object'].metadata.namespace
+                )
+
+async def watch_colorexamples():
+    # NOTE: Each of these "list_*" methods returns a list of all of the objects on the cluster when the watch is started.
+    #       Also, the "list_cluster_custom_object" doesn't just list CustomResources that are "cluster level", but also
+    #       lists (and gets events for) the namespaced CustomResources too.  This means one cluster wide watcher can be
+    #       used instead of a watcher for each namespace.
+    # FIXME: Provide a config that allows the specifying of specific namespaces to watch.
+    async with client.ApiClient() as api_client:
+        api_instance = client.CustomObjectsApi(api_client)
+        async with watch.Watch().stream(api_instance.list_cluster_custom_object, "operators.kneedeep.io", "v1", "colorexamples") as stream:
+        #async with watch.Watch().stream(api_instance.list_namespaced_custom_object, "operators.kneedeep.io", "v1", "default", "colorexamples") as stream:
+            async for event in stream:
+                logging.info(
+                    "ColorExample Event - Type: %s, Object: %s",
+                    event['type'],
+                    event['object']
+                )
+
 ### MAIN ###
 async def main():
     # Get Environment Variables
@@ -75,6 +111,8 @@ async def main():
         level = (logging.DEBUG if debug_logging else logging.INFO)
     )
 
+    # FIXME: Setup proper SIGNAL (e.g. SIG-TERM) handling here.
+
     # FIXME: Remove override later (or make is a separate config)
     logging.getLogger('kubernetes').setLevel(logging.INFO)
     logging.getLogger('kubernetes_asyncio').setLevel(logging.INFO)
@@ -87,6 +125,12 @@ async def main():
         # Check for existence of CustomResourceDefinitions (CRDs) needed by this operator
         await check_for_crd("manifests/colorexample-crd.yaml", create_allowed = crd_create_allowed)
 
+        # FIXME: REMOVE LATER: Trying to watch namespaces and pods
+        watcher_coroutines = []
+        #watcher_coroutines.append(asyncio.ensure_future(watch_namespaces()))
+        #watcher_coroutines.append(asyncio.ensure_future(watch_pods()))
+        watcher_coroutines.append(asyncio.ensure_future(watch_colorexamples()))
+
         # FIXME: Check for and read CustomResource (CR) from CRD
         # FIXME: FUTURE: How to handle k8s streaming events for the CRs?
 
@@ -95,6 +139,13 @@ async def main():
         # FIXME: Deploy new versions of the resources
 
         # FIXME: Should the operator check for status of deployed resources?
+
+        # FIXME: Add all of the "watch_*" coroutines to a list and then await them all here at the end.
+        for watcher in watcher_coroutines:
+            logging.info("Watcher Coroutine running: %s", watcher)
+        for watcher in watcher_coroutines:
+            logging.info("Waiting for watcher to finish: %s", watcher)
+            await watcher
     except CannotContinueException as ex:
         # If we get here, things went really bad.  This is to force a failure condition in kubernetes.
         logging.error("Caught CannotContinueException, so something went really bad.  Exiting unhappy.")
