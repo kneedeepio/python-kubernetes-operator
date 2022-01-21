@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 
 ### IMPORTS ###
-from .customresourcedefinition import CustomResourceDefinition
+from .customresourcedefinitionwrapper import CustomResourceDefinitionWrapper
+
+from .customresourceevent import CustomResourceEvent
+
+from .customresourcewatcher import CustomResourceWatcherCluster
+#from .customresourcewatcher import CustomResourceWatcherNamespace
 
 from .exceptions import ManifestEmptyException
 from .exceptions import ManifestMissingValueException

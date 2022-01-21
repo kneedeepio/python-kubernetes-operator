@@ -16,7 +16,7 @@ from .metadata import Metadata
 ### FUNCTIONS ###
 
 ### CLASSES ###
-class CustomResourceDefinition:
+class CustomResourceDefinitionWrapper:
     def __init__(self, manifest_dict = None):
         self.logger = logging.getLogger(type(self).__name__)
 

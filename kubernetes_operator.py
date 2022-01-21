@@ -11,7 +11,7 @@ import yaml
 from kubernetes_asyncio import client, config, watch
 from kubernetes_asyncio.client.api_client import ApiClient, ApiException
 
-from k8sobjects import CustomResourceDefinition
+from operator_utils import CustomResourceDefinitionWrapper, CustomResourceWatcherCluster
 
 ### GLOBALS ###
 
@@ -24,7 +24,7 @@ async def check_for_crd(yaml_filename, create_allowed = False):
     # Load the contents of the yaml file
     async with aiofiles.open(yaml_filename, mode='r') as file:
         contents = await file.read()
-        tmp_crd_input = CustomResourceDefinition(yaml.safe_load(contents))
+        tmp_crd_input = CustomResourceDefinitionWrapper(yaml.safe_load(contents))
 
     async with ApiClient() as api_client:
         api_instance = client.ApiextensionsV1Api(api_client)
@@ -129,7 +129,16 @@ async def main():
         watcher_coroutines = []
         #watcher_coroutines.append(asyncio.ensure_future(watch_namespaces()))
         #watcher_coroutines.append(asyncio.ensure_future(watch_pods()))
-        watcher_coroutines.append(asyncio.ensure_future(watch_colorexamples()))
+
+        #watcher_coroutines.append(asyncio.ensure_future(watch_colorexamples()))
+
+        crd_queue = asyncio.Queue()
+        colorexample_watcher = CustomResourceWatcherCluster("operators.kneedeep.io", "v1", "colorexamples", crd_queue)
+
+        watcher_coroutines.append(asyncio.ensure_future(colorexample_watcher.watcher()))
+
+        for watcher in watcher_coroutines:
+            logging.info("Watcher Coroutine running: %s", watcher)
 
         # FIXME: Check for and read CustomResource (CR) from CRD
         # FIXME: FUTURE: How to handle k8s streaming events for the CRs?
@@ -142,14 +151,12 @@ async def main():
 
         # FIXME: Add all of the "watch_*" coroutines to a list and then await them all here at the end.
         for watcher in watcher_coroutines:
-            logging.info("Watcher Coroutine running: %s", watcher)
-        for watcher in watcher_coroutines:
             logging.info("Waiting for watcher to finish: %s", watcher)
             await watcher
     except CannotContinueException as ex:
         # If we get here, things went really bad.  This is to force a failure condition in kubernetes.
         logging.error("Caught CannotContinueException, so something went really bad.  Exiting unhappy.")
-        sys.exit(1)
+        sys.exit(1) # FIXME: Should make this a return value and use a 'finally' block to close and finish out the watchers.
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
