@@ -20,4 +20,4 @@ class CustomResourceEvent:
         self.plural = plural
         self.namespace = namespace
         self.name = name
-        self.event_type = event_type
+        self.event_type = event_type # FIXME: Should this be made an enum?
