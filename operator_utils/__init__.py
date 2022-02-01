@@ -8,6 +8,8 @@ from .customresourceevent import CustomResourceEvent
 from .customresourcewatcher import CustomResourceWatcherCluster
 #from .customresourcewatcher import CustomResourceWatcherNamespace
 
+from .deploymentwrapper import DeploymentWrapper
+
 from .exceptions import ManifestEmptyException
 from .exceptions import ManifestMissingValueException
 from .exceptions import ManifestSchemaInvalidTypeException

@@ -12,7 +12,7 @@ from .exceptions import ManifestEmptyException, ManifestMissingValueException
 ### FUNCTIONS ###
 
 ### CLASSES ###
-class Metadata:
+class EnvVar:
     def __init__(self, manifest_dict = None):
         self.logger = logging.getLogger(type(self).__name__)
 
@@ -23,14 +23,17 @@ class Metadata:
             raise TypeError
 
         # FIXME: Only supporting attributes that are currently being used.
-        self._name = None
         if 'name' in manifest_dict:
             self.name = manifest_dict['name']
+        else:
+            # 'name' should always be specified in the metadata
+            self.logger.error("EnvVar missing 'name'")
+            raise ManifestMissingValueException("EnvVar missing 'name'")
 
-        self._labels = None
-        if 'labels' in manifest_dict:
+        self._value = None
+        if 'value' in manifest_dict:
             # This should be a dictionary of strings as key value pairs
-            self.labels = manifest_dict['labels']
+            self.value = manifest_dict['value']
 
     @property
     def name(self):
@@ -45,18 +48,19 @@ class Metadata:
         self._name = value
 
     @property
-    def labels(self):
-        return self._labels
+    def value(self):
+        return self._value
 
-    @labels.setter
-    def labels(self, value):
-        if not isinstance(value, dict):
+    @value.setter
+    def value(self, value):
+        if not isinstance(value, str):
             raise TypeError
-        self._labels = value
+        self._value = value
 
     def get_k8sapi_object(self):
         self.logger.debug("get_k8sapi_object - None")
-        tmp_obj = client.V1ObjectMeta()
-        tmp_obj.name = self.name
-        tmp_obj.labels = self.labels
+        tmp_obj = client.V1EnvVar(
+            name = self.name
+        )
+        tmp_obj.value = self.value
         return tmp_obj
